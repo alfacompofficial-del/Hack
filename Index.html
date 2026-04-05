@@ -1,1 +1,86 @@
+from flask import Flask, request
+import requests
+import json
+from datetime import datetime
 
+app = Flask(name)
+
+BOT_TOKEN = "8444731287:AAG8HWyjpjk_uz17MRZAObbUBt4UMYOX3Cw"
+BOT_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+@app.route(f'/{BOT_TOKEN}', methods=['POST'])
+def webhook():
+    update = request.get_json()
+    
+    if 'message' in update:
+        message = update['message']
+        chat_id = message['chat']['id']
+        user = message['from']
+        command = message.get('text', '').lower()
+        
+        if command == '/start' or 'info' in command:
+            user_data = extract_user_info(user)
+            send_detailed_info(chat_id, user_data)
+    
+    return 'OK'
+
+def extract_user_info(user):
+    """Извлекает ВСЕ доступные данные о пользователе"""
+    data = {
+        'id': user.get('id', 'N/A'),
+        'first_name': user.get('first_name', 'N/A'),
+        'last_name': user.get('last_name', 'N/A'),
+        'username': user.get('username', 'N/A'),
+        'language_code': user.get('language_code', 'N/A'),
+        'is_premium': user.get('is_premium', False),
+        'is_bot': user.get('is_bot', False),
+        'added_to_attachment_menu': user.get('added_to_attachment_menu', False)
+    }
+    
+    # Дополнительная информация о чате
+    chat = {
+        'chat_id': user.get('id'),
+        'chat_type': 'private',
+        'title': 'Private chat'
+    }
+    
+    return {
+        'user': data,
+        'chat': chat,
+        'timestamp': datetime.now().isoformat(),
+        'ip': request.remote_addr if request else 'N/A'
+    }
+
+def send_detailed_info(chat_id, user_data):
+    """Отправляет полную информацию в красиво оформленном виде"""
+    message = f"""
+🔍 <b>ПОЛНАЯ ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ</b>
+
+🆔 <b>ID:</b> <code>{user_data['user']['id']}</code>
+👤 <b>Имя:</b> {user_data['user']['first_name']}
+💼 <b>Фамилия:</b> {user_data['user']['last_name']}
+📛 <b>Username:</b> <code>@{user_data['user']['username']}</code>
+🌐 <b>Язык:</b> {user_data['user']['language_code']}
+⭐ <b>Premium:</b> {'✅' if user_data['user']['is_premium'] else '❌'}
+🤖 <b>Бот:</b> {'✅' if user_data['user']['is_bot'] else '❌'}
+
+📱 <b>Chat ID:</b> <code>{user_data['chat']['chat_id']}</code>
+📅 <b>Время:</b> {user_data['timestamp']}
+
+💻 <b>IP:</b> <code>{user_data['ip']}</code>
+    """
+    
+    url = f"{BOT_URL}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': message,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': True
+    }
+    requests.post(url, json=payload)
+
+if name == 'main':
+    # Устанавливаем webhook на твой домен
+    webhook_url = "https://test.alfacomp.uz/8444731287:AAG8HWyjpjk_uz17MRZAObbUBt4UMYOX3Cw"
+    requests.post(f"{BOT_URL}/setWebhook", data={'url': webhook_url})
+    app.run(host='0.0.0.0', port=5000)
